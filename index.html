@@ -209,7 +209,8 @@
     padding:clamp(56px,9vh,110px) 0}
   .compare{position:relative;overflow:hidden;border:1px solid var(--line);user-select:none;
     touch-action:none;cursor:ew-resize;aspect-ratio:16/9;background:#000}
-  .compare img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+  .compare img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+    -webkit-user-drag:none;user-drag:none;pointer-events:auto}
   .compare .after{clip-path:inset(0 0 0 50%)}
   .compare .handle{position:absolute;top:0;bottom:0;left:50%;width:1px;background:rgba(243,239,231,.85);z-index:4}
   .compare .handle::after{content:"";position:absolute;top:50%;left:50%;width:42px;height:42px;
@@ -981,7 +982,7 @@
   var cmp = document.getElementById("compare"),
       after = document.getElementById("cmpAfter"),
       handle = document.getElementById("cmpHandle");
-  var dragging = false;
+  var dragging = false, cmpDownX = null, cmpMoved = false;
   function setPos(clientX){
     var r = cmp.getBoundingClientRect();
     var p = Math.min(1, Math.max(0, (clientX - r.left) / r.width));
@@ -989,18 +990,27 @@
     after.style.clipPath = "inset(0 0 0 " + pct + ")";
     handle.style.left = pct;
   }
-  function start(e){
-    dragging = true;
-    var x = (e.touches ? e.touches[0].clientX : e.clientX);
-    setPos(x);
-  }
+  cmp.addEventListener("dragstart", function(e){ e.preventDefault(); });
   cmp.addEventListener("pointerdown", function(e){
-    dragging = true; cmp.setPointerCapture(e.pointerId); setPos(e.clientX);
+    cmpDownX = e.clientX; cmpMoved = false; dragging = false;
   });
-  cmp.addEventListener("pointermove", function(e){ if (dragging) setPos(e.clientX); });
-  window.addEventListener("pointerup", function(){ dragging = false; });
+  window.addEventListener("pointermove", function(e){
+    if (cmpDownX === null) return;
+    if (!cmpMoved && Math.abs(e.clientX - cmpDownX) > 6){
+      cmpMoved = true; dragging = true;
+    }
+    if (dragging) setPos(e.clientX);
+  });
+  window.addEventListener("pointerup", function(e){
+    if (dragging) setPos(e.clientX);
+    if (cmpMoved) window.__cmpEnd = { x: e.clientX, y: e.clientY };   /* 让拖动尾随的那次 click 让位 */
+    dragging = false; cmpDownX = null; cmpMoved = false;
+  });
   cmp.addEventListener("touchmove", function(e){
-    if (dragging){ setPos(e.touches[0].clientX); e.preventDefault(); }
+    if (cmpDownX !== null){
+      if (!cmpMoved && Math.abs(e.touches[0].clientX - cmpDownX) > 6){ cmpMoved = true; dragging = true; }
+      if (dragging){ setPos(e.touches[0].clientX); e.preventDefault(); }
+    }
   }, {passive:false});
 
   /* 首屏视差 */
